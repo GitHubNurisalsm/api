@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Check, CornerDownLeft, X } from "lucide-react"
+import { Check, CornerDownLeft, Lightbulb, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
@@ -60,6 +60,7 @@ export function WrittenInput({
   value,
   verdict,
   placeholder = "Введите ответ",
+  hint,
   onChange,
   onSubmit,
   onSkip,
@@ -68,6 +69,7 @@ export function WrittenInput({
   value: string
   verdict: Verdict
   placeholder?: string
+  hint?: string | null
   onChange: (value: string) => void
   onSubmit: () => void
   onSkip?: () => void
@@ -116,6 +118,12 @@ export function WrittenInput({
           </div>
         )}
       </div>
+      {hint && verdict === "idle" && (
+        <p className="flex items-start gap-1.5 px-1 text-xs text-muted-foreground">
+          <Lightbulb className="mt-0.5 size-3.5 shrink-0" />
+          {hint}
+        </p>
+      )}
     </form>
   )
 }

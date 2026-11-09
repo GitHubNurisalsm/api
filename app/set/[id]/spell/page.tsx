@@ -6,7 +6,7 @@ import { useParams } from "next/navigation"
 import { Headphones, RotateCcw, Trophy, Volume2 } from "lucide-react"
 import type { Term } from "@/lib/types"
 import { useSet, useStore } from "@/lib/store"
-import { gradeAnswer, shuffle } from "@/lib/text"
+import { answerHint, gradeAnswer, shuffle } from "@/lib/text"
 import { speak, stopSpeaking } from "@/lib/speech"
 import { StudyShell } from "@/components/study-shell"
 import { NotFoundSet } from "@/components/not-found-set"
@@ -164,6 +164,7 @@ export default function SpellPage() {
             value={input}
             verdict={verdict}
             placeholder="Напишите, что услышали"
+            hint={answerHint(current.term)}
             onChange={setInput}
             onSubmit={submit}
             onSkip={() => {

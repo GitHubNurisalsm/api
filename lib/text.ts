@@ -1,4 +1,5 @@
-const PUNCT = /[.,/#!$%^&*;:{}=\-_`~()[\]"'?¿¡«»„“”’]/g
+/** Punctuation and placeholder marks that never change the meaning of an answer. */
+const PUNCT = /[.,/#!$%^&*;:{}=\-_`~()[\]"'?¿¡«»„“”’‘‚…–—·|]/g
 
 export function stripAccents(value: string) {
   return value.normalize("NFD").replace(/[̀-ͯ]/g, "")
@@ -14,50 +15,108 @@ export function normalizeAnswer(value: string, accentInsensitive = true) {
   return out
 }
 
-/** Levenshtein distance, capped for performance on long strings. */
-export function levenshtein(a: string, b: string) {
+/**
+ * Damerau-Levenshtein distance (optimal string alignment).
+ * Swapping two neighbouring letters — the most common typing slip —
+ * costs one edit, not two.
+ */
+export function editDistance(a: string, b: string) {
   if (a === b) return 0
   if (!a.length) return b.length
   if (!b.length) return a.length
-  let prev = new Array(b.length + 1)
-  let curr = new Array(b.length + 1)
+  let beforePrev = new Array<number>(b.length + 1).fill(0)
+  let prev = new Array<number>(b.length + 1)
+  let curr = new Array<number>(b.length + 1)
   for (let j = 0; j <= b.length; j++) prev[j] = j
   for (let i = 1; i <= a.length; i++) {
     curr[0] = i
     for (let j = 1; j <= b.length; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1
-      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost)
+      let best = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost)
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        best = Math.min(best, beforePrev[j - 2] + 1)
+      }
+      curr[j] = best
     }
-    const tmp = prev
+    const recycled = beforePrev
+    beforePrev = prev
     prev = curr
-    curr = tmp
+    curr = recycled
   }
   return prev[b.length]
 }
 
 export type GradeResult = "correct" | "typo" | "wrong"
 
+/** Splits an answer into the alternatives it offers: "a / b", "a, b", "a или b". */
+const ALT_SPLIT = /[,;/]|\sили\s|\sor\s/gi
+
+/** Text in brackets is an optional hint, never part of the answer. */
+function stripHints(value: string) {
+  return value.replace(/\([^)]*\)/g, " ")
+}
+
 /**
- * Accepts multiple answers separated by "," "/" or ";".
- * Returns "typo" when the answer is one or two characters away.
+ * Every spelling that counts as the right answer:
+ * the full text, the full text without bracketed hints,
+ * and each alternative on its own.
+ */
+function expectedVariants(expected: string, accentInsensitive: boolean) {
+  const variants = new Set<string>()
+  const push = (raw: string) => {
+    const normalized = normalizeAnswer(raw, accentInsensitive)
+    if (normalized) variants.add(normalized)
+  }
+  push(expected)
+  push(stripHints(expected))
+  for (const part of expected.split(ALT_SPLIT)) {
+    push(part)
+    push(stripHints(part))
+  }
+  return Array.from(variants)
+}
+
+/** Canonical key of a multi-part answer, so the order of alternatives does not matter. */
+function partsKey(value: string, accentInsensitive: boolean) {
+  const parts = value
+    .split(ALT_SPLIT)
+    .map((part) => normalizeAnswer(stripHints(part), accentInsensitive))
+    .filter(Boolean)
+  return parts.length > 1 ? parts.slice().sort().join("|") : ""
+}
+
+/**
+ * Grades a typed answer.
+ *
+ * Counts as correct: the whole answer as written, any single alternative,
+ * the alternatives in any order, and the answer without bracketed hints.
+ * Counts as a typo: one or two characters away from any of those.
  */
 export function gradeAnswer(input: string, expected: string, accentInsensitive = true): GradeResult {
   const given = normalizeAnswer(input, accentInsensitive)
   if (!given) return "wrong"
-  const variants = expected
-    .split(/[,/;]|\sили\s|\sor\s/gi)
-    .map((v) => normalizeAnswer(v, accentInsensitive))
-    .filter(Boolean)
-  if (!variants.length) variants.push(normalizeAnswer(expected, accentInsensitive))
+
+  const variants = expectedVariants(expected, accentInsensitive)
+  if (!variants.length) return "wrong"
+  if (variants.includes(given)) return "correct"
+
+  const expectedKey = partsKey(expected, accentInsensitive)
+  if (expectedKey && partsKey(input, accentInsensitive) === expectedKey) return "correct"
 
   for (const variant of variants) {
-    if (given === variant) return "correct"
-  }
-  for (const variant of variants) {
     const tolerance = variant.length <= 4 ? 0 : variant.length <= 8 ? 1 : 2
-    if (tolerance > 0 && levenshtein(given, variant) <= tolerance) return "typo"
+    if (tolerance > 0 && editDistance(given, variant) <= tolerance) return "typo"
   }
   return "wrong"
+}
+
+/** Short note shown under the input so the expected format is never a guessing game. */
+export function answerHint(expected: string): string | null {
+  const alternatives = expected.split(ALT_SPLIT).filter((part) => part.trim()).length
+  if (alternatives > 1) return "Достаточно одного варианта — писать все через « / » не обязательно"
+  if (/\([^)]*\)/.test(expected)) return "Текст в скобках можно не писать"
+  if (/[…]|\.\.\./.test(expected)) return "Многоточие в конце писать не нужно"
+  return null
 }
 
 export type ParsedPair = { term: string; definition: string }

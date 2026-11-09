@@ -6,7 +6,7 @@ import { useParams } from "next/navigation"
 import { RotateCcw, Settings2, Star, Trophy, Volume2 } from "lucide-react"
 import type { Term } from "@/lib/types"
 import { useSet, useStore } from "@/lib/store"
-import { gradeAnswer, shuffle } from "@/lib/text"
+import { answerHint, gradeAnswer, shuffle } from "@/lib/text"
 import { speak } from "@/lib/speech"
 import { StudyShell } from "@/components/study-shell"
 import { NotFoundSet } from "@/components/not-found-set"
@@ -225,6 +225,7 @@ export default function WritePage() {
           <WrittenInput
             value={input}
             verdict={verdict}
+            hint={answerHint(expected)}
             onChange={setInput}
             onSubmit={submit}
             onSkip={() => {

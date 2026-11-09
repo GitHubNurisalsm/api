@@ -7,7 +7,7 @@ import { ArrowRight, Settings2, Sparkles, Star, Trophy, Volume2 } from "lucide-r
 import type { Term } from "@/lib/types"
 import { useSet, useStore } from "@/lib/store"
 import { buildLearnRound, cardOf, masteryFor, MAX_BOX } from "@/lib/srs"
-import { gradeAnswer, pickRandom, shuffle } from "@/lib/text"
+import { answerHint, gradeAnswer, pickRandom, shuffle } from "@/lib/text"
 import { speak } from "@/lib/speech"
 import { StudyShell } from "@/components/study-shell"
 import { NotFoundSet } from "@/components/not-found-set"
@@ -327,6 +327,7 @@ export default function LearnPage() {
             <WrittenInput
               value={input}
               verdict={verdict}
+              hint={answerHint(expected)}
               onChange={setInput}
               onSubmit={submitWritten}
               onSkip={() => {
