@@ -1,0 +1,12 @@
+{
+  "name": "QuizMaster — карточки и тесты",
+  "short_name": "QuizMaster",
+  "description": "Флеш-карточки, заучивание, тесты и игра «Подбор». Без лимитов.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f7fb",
+  "theme_color": "#4255ff",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
