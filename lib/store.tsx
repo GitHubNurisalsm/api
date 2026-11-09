@@ -16,6 +16,10 @@ type Ctx = {
   updateSet: (id: string, patch: Partial<Omit<StudySet, "id">>) => void
   deleteSet: (id: string) => void
   duplicateSet: (id: string) => string | null
+  addPacks: (
+    packs: { title: string; description: string; pairs: [string, string][]; termLang?: string; defLang?: string }[],
+    folderId: string | null,
+  ) => { added: number; skipped: number; terms: number }
   getSet: (id: string) => StudySet | undefined
   toggleStar: (setId: string, termId: string) => void
   starAll: (setId: string, starred: boolean) => void
@@ -163,6 +167,40 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         }
         setState((prev) => ({ ...prev, sets: [copy, ...prev.sets] }))
         return newId
+      },
+      addPacks: (packs, folderId) => {
+        const existingTitles = new Set(state.sets.map((set) => set.title.trim().toLowerCase()))
+        const fresh: StudySet[] = []
+        let skipped = 0
+        let terms = 0
+        const now = Date.now()
+        packs.forEach((pack, index) => {
+          if (existingTitles.has(pack.title.trim().toLowerCase())) {
+            skipped += 1
+            return
+          }
+          existingTitles.add(pack.title.trim().toLowerCase())
+          terms += pack.pairs.length
+          fresh.push({
+            id: makeId("set"),
+            title: pack.title,
+            description: pack.description,
+            folderId,
+            createdAt: now + index,
+            updatedAt: now + index,
+            termLang: pack.termLang ?? "de-DE",
+            defLang: pack.defLang ?? "ru-RU",
+            author: "you",
+            terms: pack.pairs.map(([term, definition]) => ({
+              id: makeId("t"),
+              term,
+              definition,
+              starred: false,
+            })),
+          })
+        })
+        if (fresh.length) setState((prev) => ({ ...prev, sets: [...fresh, ...prev.sets] }))
+        return { added: fresh.length, skipped, terms }
       },
       getSet: (id) => state.sets.find((set) => set.id === id),
       toggleStar: (setId, termId) => {

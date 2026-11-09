@@ -254,6 +254,9 @@ function EmptyLibrary() {
           <Link href="/create">Создать модуль</Link>
         </Button>
         <Button asChild variant="outline" className="rounded-full font-bold">
+          <Link href="/catalog">Готовый курс немецкого</Link>
+        </Button>
+        <Button asChild variant="ghost" className="rounded-full font-bold">
           <Link href="/settings#import">Импорт из файла</Link>
         </Button>
       </div>

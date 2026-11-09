@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import * as React from "react"
-import { ArrowRight, BookOpen, Flame, Folder, Gamepad2, GraduationCap, Keyboard, Layers, Plus, Sparkles, Timer } from "lucide-react"
+import { ArrowRight, BookOpen, Flame, Folder, Gamepad2, GraduationCap, Keyboard, Languages, Layers, Plus, Sparkles, Timer } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { masteryFor, streakFromDays } from "@/lib/srs"
 import { plural } from "@/lib/text"
@@ -102,6 +102,25 @@ export default function HomePage() {
             </Button>
           </div>
         )}
+      </section>
+
+      {/* Ready-made course */}
+      <section className="mt-6">
+        <Link
+          href="/catalog"
+          className="flex flex-wrap items-center gap-4 rounded-xl border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-md"
+        >
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+            <Languages className="size-6" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-extrabold">Готовый курс немецкого A1 → C1</span>
+            <span className="mt-0.5 block text-sm text-muted-foreground">
+              39 модулей и 1786 карточек: лексика, грамматика и речевые обороты. Добавьте в свою папку в один клик.
+            </span>
+          </span>
+          <ArrowRight className="size-5 shrink-0 text-muted-foreground" />
+        </Link>
       </section>
 
       {/* Folders */}

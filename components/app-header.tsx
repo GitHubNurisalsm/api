@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { BookOpen, FolderPlus, Library, Menu, Plus, Search, Settings, Sparkles, Upload, X } from "lucide-react"
+import { BookOpen, FolderPlus, Languages, Library, Menu, Plus, Search, Settings, Sparkles, Upload, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -21,6 +21,7 @@ const NAV = [
   { href: "/", label: "Главная", icon: BookOpen },
   { href: "/library", label: "Библиотека", icon: Library },
   { href: "/stats", label: "Прогресс", icon: Sparkles },
+  { href: "/catalog", label: "Каталог", icon: Languages },
 ]
 
 export function AppHeader() {
@@ -161,6 +162,10 @@ export function AppHeader() {
               <DropdownMenuItem onClick={() => router.push("/library?new=folder")}>
                 <FolderPlus className="size-4" />
                 Папка
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/catalog")}>
+                <Languages className="size-4" />
+                Готовый курс немецкого
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => router.push("/settings#import")}>
