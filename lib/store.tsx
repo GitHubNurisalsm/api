@@ -143,19 +143,34 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("storage", onStorage)
   }, [])
 
+  /**
+   * True when this browser only holds the untouched demo content it was
+   * seeded with. Such a device adopts the account's library outright, so
+   * signing in does not leave duplicate demo modules behind.
+   */
+  const isPristineSeed = React.useCallback((candidate: AppState) => {
+    return (
+      candidate.sets.length > 0 &&
+      candidate.sets.every((set) => set.author === "demo" && set.updatedAt === set.createdAt) &&
+      Object.keys(candidate.progress).length === 0 &&
+      candidate.stats.cardsStudied === 0
+    )
+  }, [])
+
   /** Pulls the account's state and merges it into whatever this device holds. */
   const pullAndMerge = React.useCallback(async () => {
     const response = await fetch("/api/state", { cache: "no-store" })
     if (!response.ok) throw new Error("pull failed")
     const payload = (await response.json()) as { state: AppState | null }
     if (payload.state && Array.isArray(payload.state.sets)) {
-      const merged = mergeStates(stateRef.current, migrate(payload.state) ?? payload.state)
+      const remote = migrate(payload.state) ?? payload.state
+      const merged = isPristineSeed(stateRef.current) ? remote : mergeStates(stateRef.current, remote)
       stateRef.current = merged
       setState(merged)
     }
     setSyncArmed(true)
     setLastSyncedAt(Date.now())
-  }, [])
+  }, [isPristineSeed])
 
   const push = React.useCallback(async () => {
     setSyncStatus("saving")

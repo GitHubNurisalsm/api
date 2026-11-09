@@ -32,7 +32,7 @@ function buildSet(
     updatedAt: createdAt,
     termLang,
     defLang,
-    author: "you",
+    author: "demo",
   }
 }
 
