@@ -145,6 +145,7 @@ export function createSeedState(): AppState {
 
   return {
     version: 1,
+    deleted: {},
     sets,
     folders: [languages, science],
     progress: {},
@@ -158,6 +159,7 @@ export function createSeedState(): AppState {
 export function emptyState(): AppState {
   return {
     version: 1,
+    deleted: {},
     sets: [],
     folders: [],
     progress: {},

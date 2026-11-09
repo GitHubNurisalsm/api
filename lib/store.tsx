@@ -4,13 +4,25 @@ import * as React from "react"
 import type { AppState, Folder, Settings, SetProgress, StudySet, TestResult, Term } from "./types"
 import { DEFAULT_SETTINGS } from "./types"
 import { createSeedState, emptyState, makeId } from "./seed"
+import { mergeStates } from "./merge"
 import { applyAnswer, cardOf, dayKey, emptyProgress } from "./srs"
 
 const STORAGE_KEY = "quizmaster.state.v1"
 
+export type Account = { username: string; displayName: string }
+export type SyncStatus = "off" | "checking" | "synced" | "saving" | "error"
+
 type Ctx = {
   state: AppState
   ready: boolean
+  /* account */
+  account: Account | null
+  syncStatus: SyncStatus
+  lastSyncedAt: number | null
+  register: (username: string, password: string, displayName?: string) => Promise<{ ok: boolean; error?: string }>
+  login: (username: string, password: string) => Promise<{ ok: boolean; error?: string }>
+  logout: () => Promise<void>
+  syncNow: () => Promise<void>
   /* sets */
   createSet: (input: { title: string; description?: string; terms?: Term[]; folderId?: string | null; termLang?: string; defLang?: string }) => string
   updateSet: (id: string, patch: Partial<Omit<StudySet, "id">>) => void
@@ -51,6 +63,7 @@ function migrate(parsed: unknown): AppState | null {
   if (!Array.isArray(candidate.sets)) return null
   return {
     version: 1,
+    deleted: candidate.deleted ?? {},
     sets: candidate.sets.map((set) => ({
       ...set,
       folderId: set.folderId ?? null,
@@ -72,6 +85,14 @@ function migrate(parsed: unknown): AppState | null {
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<AppState>(() => emptyState())
   const [ready, setReady] = React.useState(false)
+  const [account, setAccount] = React.useState<Account | null>(null)
+  const [syncStatus, setSyncStatus] = React.useState<SyncStatus>("checking")
+  const [lastSyncedAt, setLastSyncedAt] = React.useState<number | null>(null)
+  /** Pushing is held back until the account's state has been pulled and merged. */
+  const [syncArmed, setSyncArmed] = React.useState(false)
+  const stateRef = React.useRef(state)
+  stateRef.current = state
+  const pushTimer = React.useRef<number | null>(null)
 
   React.useEffect(() => {
     try {
@@ -108,15 +129,140 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("storage", onStorage)
   }, [])
 
+  /** Pulls the account's state and merges it into whatever this device holds. */
+  const pullAndMerge = React.useCallback(async () => {
+    const response = await fetch("/api/state", { cache: "no-store" })
+    if (!response.ok) throw new Error("pull failed")
+    const payload = (await response.json()) as { state: AppState | null }
+    if (payload.state && Array.isArray(payload.state.sets)) {
+      const merged = mergeStates(stateRef.current, migrate(payload.state) ?? payload.state)
+      stateRef.current = merged
+      setState(merged)
+    }
+    setSyncArmed(true)
+    setLastSyncedAt(Date.now())
+  }, [])
+
+  const push = React.useCallback(async () => {
+    setSyncStatus("saving")
+    try {
+      const response = await fetch("/api/state", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(stateRef.current),
+      })
+      if (!response.ok) throw new Error("push failed")
+      setLastSyncedAt(Date.now())
+      setSyncStatus("synced")
+    } catch {
+      setSyncStatus("error")
+    }
+  }, [])
+
+  // Who is signed in on this device?
+  React.useEffect(() => {
+    if (!ready) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const response = await fetch("/api/auth/me", { cache: "no-store" })
+        const payload = (await response.json()) as { user: { username?: string; displayName?: string } | null }
+        if (cancelled) return
+        if (!payload.user) {
+          setSyncStatus("off")
+          return
+        }
+        setAccount({
+          username: payload.user.username ?? "",
+          displayName: payload.user.displayName ?? payload.user.username ?? "",
+        })
+        await pullAndMerge()
+        if (!cancelled) setSyncStatus("synced")
+      } catch {
+        if (!cancelled) setSyncStatus(account ? "error" : "off")
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready])
+
+  // Save to the account shortly after any change settles.
+  React.useEffect(() => {
+    if (!ready || !account || !syncArmed) return
+    if (pushTimer.current) window.clearTimeout(pushTimer.current)
+    pushTimer.current = window.setTimeout(() => void push(), 1500)
+    return () => {
+      if (pushTimer.current) window.clearTimeout(pushTimer.current)
+    }
+  }, [state, ready, account, syncArmed, push])
+
+  // Pull again when the tab regains focus, so another device's work shows up.
+  React.useEffect(() => {
+    if (!account || !syncArmed) return
+    function onFocus() {
+      void pullAndMerge().catch(() => setSyncStatus("error"))
+    }
+    window.addEventListener("focus", onFocus)
+    return () => window.removeEventListener("focus", onFocus)
+  }, [account, syncArmed, pullAndMerge])
+
   const value = React.useMemo<Ctx>(() => {
     const touchProgress = (draft: AppState, setId: string) => {
       if (!draft.progress[setId]) draft.progress[setId] = emptyProgress()
       return draft.progress[setId]
     }
 
+    async function authenticate(path: string, payload: Record<string, unknown>) {
+      try {
+        const response = await fetch(path, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+        const data = (await response.json().catch(() => ({}))) as { user?: Account; error?: string }
+        if (!response.ok || !data.user) {
+          return { ok: false, error: data.error ?? "Не удалось связаться с сервером" }
+        }
+        setAccount(data.user)
+        setSyncStatus("saving")
+        await pullAndMerge()
+        await push()
+        return { ok: true }
+      } catch {
+        return { ok: false, error: "Нет связи с сервером" }
+      }
+    }
+
     return {
       state,
       ready,
+      account,
+      syncStatus,
+      lastSyncedAt,
+      register: (username, password, displayName) => authenticate("/api/auth/register", { username, password, displayName }),
+      login: (username, password) => authenticate("/api/auth/login", { username, password }),
+      logout: async () => {
+        try {
+          await fetch("/api/auth/logout", { method: "POST" })
+        } catch {
+          /* clearing the local session is what matters */
+        }
+        setAccount(null)
+        setSyncArmed(false)
+        setSyncStatus("off")
+        setLastSyncedAt(null)
+      },
+      syncNow: async () => {
+        if (!account) return
+        try {
+          await pullAndMerge()
+          await push()
+        } catch {
+          setSyncStatus("error")
+        }
+      },
       createSet: ({ title, description = "", terms = [], folderId = null, termLang = "en-US", defLang = "ru-RU" }) => {
         const id = makeId("set")
         const now = Date.now()
@@ -150,6 +296,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             sets: prev.sets.filter((set) => set.id !== id),
             recent: prev.recent.filter((setId) => setId !== id),
             progress,
+            deleted: { ...prev.deleted, [id]: Date.now() },
           }
         })
       },
@@ -232,6 +379,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           ...prev,
           folders: prev.folders.filter((folder) => folder.id !== id),
           sets: prev.sets.map((set) => (set.folderId === id ? { ...set, folderId: null } : set)),
+          deleted: { ...prev.deleted, [id]: Date.now() },
         }))
       },
       moveSetToFolder: (setId, folderId) => {
@@ -336,7 +484,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setState(withDemo ? createSeedState() : emptyState())
       },
     }
-  }, [state, ready])
+  }, [state, ready, account, syncStatus, lastSyncedAt, pullAndMerge, push])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }

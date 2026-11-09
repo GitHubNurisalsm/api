@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { BookOpen, FolderPlus, Languages, Library, Menu, Plus, Search, Settings, Sparkles, Upload, X } from "lucide-react"
+import { BookOpen, CalendarCheck, CloudOff, FolderPlus, Languages, Library, Loader2, Menu, Plus, Search, Settings, Sparkles, Upload, User, X, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -16,17 +16,21 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
+import { useStore } from "@/lib/store"
 
 const NAV = [
   { href: "/", label: "Главная", icon: BookOpen },
+  { href: "/review", label: "Повторение", icon: CalendarCheck },
   { href: "/library", label: "Библиотека", icon: Library },
   { href: "/stats", label: "Прогресс", icon: Sparkles },
   { href: "/catalog", label: "Каталог", icon: Languages },
+  { href: "/articles", label: "Артикли", icon: Zap },
 ]
 
 export function AppHeader() {
   const pathname = usePathname()
   const router = useRouter()
+  const { account, syncStatus } = useStore()
   const [query, setQuery] = React.useState("")
   const [mobileOpen, setMobileOpen] = React.useState(false)
   const searchRef = React.useRef<HTMLInputElement>(null)
@@ -80,6 +84,17 @@ export function AppHeader() {
                   {item.label}
                 </Link>
               ))}
+              <Link
+                href="/account"
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors hover:bg-secondary",
+                  pathname === "/account" && "bg-secondary text-primary",
+                )}
+              >
+                <User className="size-4" />
+                {account ? account.displayName : "Войти в профиль"}
+              </Link>
               <Link
                 href="/settings"
                 onClick={() => setMobileOpen(false)}
@@ -145,6 +160,27 @@ export function AppHeader() {
         <div className="ml-auto flex items-center gap-1 sm:ml-0">
           <Button variant="ghost" size="icon" className="sm:hidden" onClick={() => router.push("/search")} aria-label="Поиск">
             <Search className="size-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative rounded-full"
+            aria-label={account ? `Профиль ${account.displayName}` : "Войти в профиль"}
+            onClick={() => router.push("/account")}
+          >
+            {account ? (
+              <span className="grid size-7 place-items-center rounded-full bg-primary text-xs font-black text-primary-foreground">
+                {account.displayName.slice(0, 1).toUpperCase()}
+              </span>
+            ) : (
+              <User className="size-5" />
+            )}
+            {account && syncStatus === "saving" && (
+              <Loader2 className="absolute -bottom-0.5 -right-0.5 size-3.5 animate-spin rounded-full bg-card text-primary" />
+            )}
+            {account && syncStatus === "error" && (
+              <CloudOff className="absolute -bottom-0.5 -right-0.5 size-3.5 rounded-full bg-card text-destructive" />
+            )}
           </Button>
           <ThemeToggle />
           <DropdownMenu>

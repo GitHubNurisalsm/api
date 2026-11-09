@@ -2,9 +2,10 @@
 
 import Link from "next/link"
 import * as React from "react"
-import { ArrowRight, BookOpen, Flame, Folder, Gamepad2, GraduationCap, Keyboard, Languages, Layers, Plus, Sparkles, Timer } from "lucide-react"
+import { ArrowRight, BookOpen, CalendarCheck, Flame, Folder, Gamepad2, GraduationCap, Keyboard, Languages, Layers, Plus, Sparkles, Timer, Zap } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { masteryFor, streakFromDays } from "@/lib/srs"
+import { collectDue, formatDueIn, nextDueAt } from "@/lib/review"
 import { plural } from "@/lib/text"
 import { SetCard } from "@/components/set-card"
 import { Button } from "@/components/ui/button"
@@ -29,6 +30,9 @@ export default function HomePage() {
     const rest = state.sets.filter((set) => !state.recent.includes(set.id)).sort((a, b) => b.updatedAt - a.updatedAt)
     return [...recent, ...rest].slice(0, 8) as typeof state.sets
   }, [state.sets, state.recent])
+
+  const due = React.useMemo(() => (ready ? collectDue(state) : []), [state, ready])
+  const upcoming = React.useMemo(() => (ready ? nextDueAt(state) : null), [state, ready])
 
   const continueSet = recentSets[0]
   const continueMastery = continueSet ? masteryFor(continueSet, getProgress(continueSet.id)) : null
@@ -102,6 +106,48 @@ export default function HomePage() {
             </Button>
           </div>
         )}
+      </section>
+
+      {/* Daily review */}
+      <section className="mt-6 grid gap-4 sm:grid-cols-2">
+        <Link
+          href="/review"
+          className="flex items-center gap-4 rounded-xl border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-md"
+        >
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+            <CalendarCheck className="size-6" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-extrabold">
+              {due.length ? `К повторению: ${due.length}` : "Повторение по расписанию"}
+            </span>
+            <span className="mt-0.5 block text-sm text-muted-foreground">
+              {due.length
+                ? "Карточки, которые пора освежить, пока они не забылись"
+                : upcoming
+                  ? `Всё повторено. Следующее через ${formatDueIn(upcoming)}`
+                  : "Интервалы 1 → 2 → 4 → 8 → 21 день"}
+            </span>
+          </span>
+          {due.length > 0 && (
+            <span className="shrink-0 rounded-full bg-primary px-2.5 py-1 text-xs font-bold text-primary-foreground">
+              {due.length}
+            </span>
+          )}
+        </Link>
+
+        <Link
+          href="/articles"
+          className="flex items-center gap-4 rounded-xl border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-primary/60 hover:shadow-md"
+        >
+          <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-accent/20 text-accent-foreground dark:text-accent">
+            <Zap className="size-6" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-extrabold">Тренажёр артиклей</span>
+            <span className="mt-0.5 block text-sm text-muted-foreground">der / die / das на скорость, с правилами рода</span>
+          </span>
+        </Link>
       </section>
 
       {/* Ready-made course */}

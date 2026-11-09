@@ -76,6 +76,8 @@ export type Profile = {
 
 export type AppState = {
   version: number
+  /** id -> deletion time, so a delete on one device is not undone by a sync from another */
+  deleted: Record<string, number>
   sets: StudySet[]
   folders: Folder[]
   progress: Record<string, SetProgress>
