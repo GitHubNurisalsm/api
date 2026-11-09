@@ -8,6 +8,20 @@ import { mergeStates } from "./merge"
 import { applyAnswer, cardOf, dayKey, emptyProgress } from "./srs"
 
 const STORAGE_KEY = "quizmaster.state.v1"
+const DEVICE_KEY = "quizmaster.device.v1"
+
+/** A stable id for this browser, so each device syncs into its own file. */
+function deviceId() {
+  try {
+    const existing = window.localStorage.getItem(DEVICE_KEY)
+    if (existing) return existing
+    const fresh = `d${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`
+    window.localStorage.setItem(DEVICE_KEY, fresh)
+    return fresh
+  } catch {
+    return "default"
+  }
+}
 
 export type Account = { username: string; displayName: string }
 export type SyncStatus = "off" | "checking" | "synced" | "saving" | "error"
@@ -148,7 +162,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await fetch("/api/state", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-device-id": deviceId() },
         body: JSON.stringify(stateRef.current),
       })
       if (!response.ok) throw new Error("push failed")

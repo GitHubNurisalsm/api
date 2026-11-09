@@ -22,6 +22,25 @@ export function blobPath(kind: "user" | "state", key: string) {
   return `${kind === "user" ? "u" : "s"}/${digest}.json`
 }
 
+/**
+ * Each device writes its own file under the account's folder.
+ *
+ * Blob reads are eventually consistent — a write can take seconds to become
+ * visible — so a single shared file would let one device overwrite another's
+ * work after a stale read. With one writer per file that cannot happen:
+ * a stale read only delays when the other device's work shows up, and the
+ * server merges every file on the way out.
+ */
+export function statePrefix(userId: string) {
+  return `s/${createHmac("sha256", secret()).update(`state:${userId}`).digest("hex")}/`
+}
+
+const DEVICE_RULE = /^[a-zA-Z0-9_-]{6,64}$/
+
+export function safeDeviceId(value: unknown) {
+  return typeof value === "string" && DEVICE_RULE.test(value) ? value : "default"
+}
+
 export function hashPassword(password: string, salt = randomBytes(16).toString("hex")) {
   return { salt, hash: scryptSync(password, salt, 64).toString("hex") }
 }

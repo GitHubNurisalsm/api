@@ -28,6 +28,24 @@ export async function readJson<T>(pathname: string): Promise<T | null> {
   }
 }
 
+/** Every device file stored under one account, newest first. */
+export async function listJson<T>(prefix: string, limit = 20): Promise<T[]> {
+  const found = await list({ prefix, limit })
+  const blobs = found.blobs.sort((a, b) => Number(new Date(b.uploadedAt)) - Number(new Date(a.uploadedAt)))
+  const results = await Promise.all(
+    blobs.map(async (blob): Promise<T | null> => {
+      try {
+        const response = await fetch(`${blob.url}?t=${Date.now()}`, { cache: "no-store" })
+        if (!response.ok) return null
+        return (await response.json()) as T
+      } catch {
+        return null
+      }
+    }),
+  )
+  return results.filter((item): item is Awaited<T> => item !== null) as T[]
+}
+
 export type UserRecord = {
   id: string
   username: string
